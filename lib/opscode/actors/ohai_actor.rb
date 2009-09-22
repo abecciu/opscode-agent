@@ -38,7 +38,7 @@ module Opscode
     end
 
     def index(payload)
-      paths = JSON.parse(payload)
+      paths = payload
       res = Hash.new
       paths.each do |path|
         parts = path.split("/")
