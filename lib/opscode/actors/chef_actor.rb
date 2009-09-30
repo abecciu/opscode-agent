@@ -6,9 +6,9 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,7 +32,7 @@ class File
       Thread.exclusive { super }
     end
   end
-  class<<self
+  class << self
     include FileExclusiveRead
   end
 end
@@ -59,7 +59,7 @@ module Opscode
         @buffer.string
       end
     end
-    
+
     expose :collection, :resource, :recipe, :converge
     def log_to_string(&block)
       output = TeeStringLogger.new
@@ -71,33 +71,42 @@ module Opscode
     end
 
     def collection(payload)
-      node = Chef::Client.new.build_node
+      client = Chef::Client.new
+      client.register
+      client.authenticate
+      node = client.build_node
       lts = log_to_string do
-        resource_collection = payload 
+        resource_collection = payload
         resource_collection.each { |r| r.instance_variable_set(:@node, node) }
         runner = Chef::Runner.new(node, resource_collection)
         runner.converge
       end
-      { :log => lts, :resource => payload[:resource] } 
+      { :log => lts, :resource => payload[:resource] }
     end
 
     def resource(payload)
       Chef::Log.level(:debug)
+
       client = Chef::Client.new
+      client.register
+      client.authenticate
       client.build_node
+
       payload[:resource].instance_variable_set(:@node, client.node)
       lts = log_to_string do
         payload[:resource].run_action(payload[:resource].action)
       end
-      { :log => lts, :resource => payload[:resource] } 
+      { :log => lts, :resource => payload[:resource] }
     end
 
     def check_recipe(payload)
       orig_cookbook_path = Chef::Cookbook
       Chef::Log.level(:debug)
       client = Chef::Client.new
+      client.register
+      client.authenticate
       client.build_node
-      client.node
+
       tf = Tempfile.new("test-recipe")
       tf.write(payload)
       tf.close
@@ -113,12 +122,14 @@ module Opscode
       tf.write(payload)
       tf.close
       Chef::Log.level(:info)
-      collection = nil 
-      
+      collection = nil
+
       lts = log_to_string do
         client = Chef::Client.new
+        client.register
+        client.authenticate
         client.build_node
-        client.node
+
         recipe = Chef::Recipe.new('temp', 'recipe', client.node)
         recipe.from_file(tf.path)
         runner = Chef::Runner.new(client.node, recipe.collection)
